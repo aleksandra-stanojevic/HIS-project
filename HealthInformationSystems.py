@@ -7,8 +7,43 @@ import nltk
 from nltk.corpus import stopwords
 from serbian_stemmer import stem
 
-# Importing the dataset
+#importing the data
 dataset = pd.read_csv("dz nis anamneza i dijagnoza 2018.csv")
+
+#counting number of rows for each unique value from column 'sifra'
+list = dataset.groupby(['sifra']).size().reset_index(name='counts')
+
+#removing rows containing less or equal than 50 in column 'counts'
+list = list.drop(list[list.counts < 50].index)
+
+#removing all rows from data which contain a value in column 'sifra' that is in list['sifra']
+dataset = dataset[dataset['sifra'].isin(list['sifra'])]
+
+#preparing data for undersampling
+X = dataset.iloc[:, [0]].values
+y = dataset.iloc[:,[1]].values
+
+# define undersample strategy
+undersample = RandomUnderSampler(sampling_strategy='not minority')
+
+# fit and apply the transform method
+X_over, y_over = undersample.fit_resample(X, y)
+
+X_over = X_over.tolist()
+y_over = y_over.tolist()
+
+#turn lists to dataframe
+dataset = pd.DataFrame(
+    {'anamneza': X_over,
+     'sifra': y_over
+    })
+
+#convert lists made by undersampling algorithm back to str for NLP processing
+strings = []
+for text in dataset['anamneza']:
+    strings.append(' '.join(map(str, text)))
+    
+dataset['anamneza'] = strings
 
 # Importing serbian stopwords
 stops_words = set(stopwords.words("srpski"))
@@ -51,11 +86,8 @@ def clean_text(raw_text):
     
     return cleaned_text
 
-# Get text to clean
-text_to_clean = list(dataset['anamneza'])
-
 # Apply cleaning function on the dataset
-dataset['anamneza'] = apply_cleaning_function_to_list(text_to_clean)
+dataset['anamneza'] = apply_cleaning_function_to_list(dataset['anamneza'])
 
 # Replacing empty string with None
 dataset['anamneza'] = dataset['anamneza'].apply(lambda y: np.nan if len(y)==0 else y)
